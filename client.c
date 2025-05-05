@@ -13,6 +13,7 @@
 */
 
 #include <stdio.h> 
+#include <arpa/inet.h>
 #include <netdb.h> 
 #include <netinet/in.h> 
 #include <stdlib.h> 
@@ -26,6 +27,7 @@
 #define MAX 80  // max chars in a message
 #define SA struct sockaddr
 
+
 void client_to_server(int socket){
         char buff[MAX];
         int n;
@@ -35,11 +37,13 @@ void client_to_server(int socket){
             printf("Enter the string : ");
             n = 0;
             while ((buff[n++] = getchar()) != '\n');
+            
             write(socket, buff, sizeof(buff));
             bzero(buff, sizeof(buff));
             read(socket, buff, sizeof(buff));
+            
             printf("From Server : %s", buff);
-            if ((strncmp(buff, "exit", 4)) == 0) {
+            if ((strncmp(buff, "exit", 4)) == 0){
                 printf("Client Exit...\n");
                 break;
             }
@@ -56,9 +60,9 @@ int main(){
     int client_socket;
     client_socket = socket(AF_LOCAL, SOCK_STREAM, 0);  // Use TCP (would be SOCK_DGRAM for UDP)
     
-    // check success of sucket creation
+    // check success of socket creation
     if (client_socket == -1){
-        printf("Socket not created. Quiting.");
+        printf("Socket not created. Quitting.");
         return -1;
     }
     
@@ -70,13 +74,15 @@ int main(){
     server_address.sin_addr.s_addr = inet_addr("127.0.0.1");
     server_address.sin_port = htons(PORT);
     
-    if (connect(client_socket, (SA*)&server_address, sizeof(server_address)) != 0) {
+    // breaks at this if statement
+    if (connect(client_socket, (SA*)&server_address, sizeof(server_address)) != 0){
         printf("connection with the server failed...\n");
         exit(0);
     }
-    else
+    else{
         printf("connected to the server..\n");
-
+    }
+    
     
     // Step 3: Send message to server (to be sent to other clients)
     // Step 4: Receive messages from server (taken from other clients)

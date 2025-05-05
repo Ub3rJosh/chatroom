@@ -51,9 +51,11 @@ void server_to_client(int socket){
         
         // read the message from client and copy it in buffer 
         read(socket, buff, sizeof(buff)); 
+        
         // print buffer which contains the client contents 
         printf("From client: %s\t To client : ", buff); 
         bzero(buff, MAX); 
+        
         n = 0; 
         // copy server message in the buffer 
         while ((buff[n++] = getchar()) != '\n'); 
