@@ -58,7 +58,7 @@ int main(){
     // Step 1: Socket(s)
     
     int client_socket;
-    client_socket = socket(AF_LOCAL, SOCK_STREAM, 0);  // Use TCP (would be SOCK_DGRAM for UDP)
+    client_socket = socket(AF_INET, SOCK_STREAM, 0);  // Use TCP (would be SOCK_DGRAM for UDP)
     
     // check success of socket creation
     if (client_socket == -1){
@@ -77,7 +77,7 @@ int main(){
     // breaks at this if statement
     if (connect(client_socket, (SA*)&server_address, sizeof(server_address)) != 0){
         printf("connection with the server failed...\n");
-        exit(0);
+        return -1;
     }
     else{
         printf("connected to the server..\n");

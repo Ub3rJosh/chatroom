@@ -17,7 +17,8 @@
  *     - "Breakout room" functionality ("client_1 invited you to a breakout room. Accept? (y/n): ")
 */
 
-#include <stdio.h> 
+#include <stdio.h>
+#include <stdbool.h>
 #include <netdb.h> 
 #include <netinet/in.h> 
 #include <stdlib.h> 
@@ -26,21 +27,23 @@
 #include <sys/types.h> 
 #include <unistd.h> // read(), write(), close()
 
-#define MAX_SOCKETS 1  // max number of clients
+#define MAX_CLIENTS 4  // max number of connections to the server at a time
 #define PORT 8080  // port to connect to
 #define MAX 80  // max message size
 #define SA struct sockaddr
 
 
-void store_socket(int input_socket, int socket_number, int (*socket_list)[MAX_SOCKETS]){
-    // update socket array on successful creation
-    if (input_socket != -1){
-        (*socket_list)[socket_number] = input_socket;
-    }
-    else{
-        printf("Unable to create socket.");
-    }
+int client_connections[MAX_CLIENTS];
+int connected_clients = 0;
+void store_connection(int input_socket, int socket_number, int (*socket_list)[MAX_CLIENTS]){
+    (*socket_list)[socket_number] = input_socket;
 }
+
+struct connections{
+    int connection_number;
+    bool still_connected;
+    int socket;
+};
 
 void server_to_client(int socket){
     char buff[MAX]; 
@@ -76,22 +79,7 @@ int main(){
     // https://w3.cs.jmu.edu/kirkpams/OpenCSF/Books/csf/html/Sockets.html#:~:text=The%20socket%20interface%20in%20C,function%20call%20is%20the%20same.
     
     // Step 1: Socket(s) (and use Setsockopt?)
-    
-    // Allow for up to MAX_SOCKETS number of people to be chatting at a time
-    int sockets[MAX_SOCKETS] = {-1};  // initialize all values to -1
-    
-    int temp_socket;
-    for (int i = 0; i < MAX_SOCKETS; i++){
-        temp_socket = socket(AF_INET, SOCK_STREAM, 0);  // Use TCP (would be SOCK_DGRAM for UDP)
-        
-        // check success of sucket creation
-        if (temp_socket == -1){
-            printf("Socket not created. Quiting.");
-            return -1;
-        }
-        
-        store_socket(temp_socket, i, &sockets);  // store socket in socket array
-    }
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     
     
     // Step 2: Bind
@@ -101,60 +89,43 @@ int main(){
     server_address.sin_addr.s_addr = htonl(INADDR_ANY); 
     server_address.sin_port = htons(PORT); 
     
-    int bound_socket;
-    for (int i = 0; i < MAX_SOCKETS; i++){
-        // only bind successfully "socketed" sockets
-        if (sockets[i] != -1){
-            bound_socket = bind(sockets[i], (SA*)&server_address, sizeof(server_address));
-            
-            // check success of binding
-            if (bound_socket != 0){
-                printf("Binding unsuccessful. Quitting.");
-                return -1;
-            }
-        }
+    int bound_socket = bind(sockfd, (SA*)&server_address, sizeof(server_address));;
+    // check success of binding
+    if (bound_socket != 0){
+        perror("Binding unsuccessful. Quitting.");
+        return -1;
     }
     
     
     // Step 3: Listen
-    int listen_to_socket;
-    for (int i = 0; i < MAX_SOCKETS; i++){
-        listen_to_socket = listen(sockets[i], 5);  // TODO what does `5` do here?
-        if (listen_to_socket != 0){
-            printf("Listening failed");
-            return -1;
-        }
-    }
     printf("Server is listening for new clients.");
+    int listen_to_socket = listen(sockfd, 5);
     
     
     // Step 4: Accept new clients (if possible)
     struct sockaddr_in client; 
-    int len = sizeof(client);
-    for (int i = 0; i <= MAX_SOCKETS; i++){
-        int connection = accept(sockets[i], (SA*)&client, &len); 
-        if (connection < 0){ 
-            printf("server accept failed...\n"); 
-            return -1;
-        }
-        else{
-            printf("server accept the client...\n"); 
-        }
+    socklen_t len = sizeof(client);
+    int connection = accept(sockfd, (SA*)&client, &len); 
+    if (connection < 0){ 
+        perror("server accept failed...\n"); 
+        return -1;
+    }
+    else{
+        store_connection(connected_clients, connection, connected_clients);
+        connected_clients++;
+        printf("server accept the client...\n");
+        
     }
     
     
     // Step 5: Take input from client
     // Step 6: Sent to other clients
-    for (int i = 0; i <= MAX_SOCKETS; i++){
-        server_to_client(sockets[i]);
-    }
-    
+    server_to_client(connection);
     
     
     // Step 7: Terminate if requested
-    for (int i = 0; i <= MAX_SOCKETS; i++){
-        close(sockets[i]);
-    }
+    close(connection);
+    
     
     printf("\n");
     return 0;
