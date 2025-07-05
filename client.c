@@ -22,41 +22,58 @@
 #include <sys/types.h> 
 #include <unistd.h> // read(), write(), close()
 #include <sys/socket.h>
+#include <pthread.h>
 
 #define PORT 8080  // port to connect to
 #define MAX 80  // max chars in a message
 #define SA struct sockaddr
 
 
-void client_to_server(int socket){
-        char buff[MAX];
-        int n;
+void* send_to_server(void* arg){
+    int socket = *(int*)arg;
+    char buff[MAX];
+    
+    while (1){
+        bzero(buff, MAX);
+        printf("You: ");
         
-        for (;;){
-            bzero(buff, sizeof(buff));
-            printf("Enter the string : ");
-            n = 0;
-            while ((buff[n++] = getchar()) != '\n');
-            
-            write(socket, buff, sizeof(buff));
-            bzero(buff, sizeof(buff));
-            read(socket, buff, sizeof(buff));
-            
-            printf("From Server : %s", buff);
-            if ((strncmp(buff, "exit", 4)) == 0){
-                printf("Client Exit...\n");
-                break;
-            }
+        fgets(buff, MAX, stdin);  // take in message
+        write(socket, buff, strlen(buff));  // write message
+        
+        // exit if that's what we want
+        if (strncmp(buff, "exit", 4) == 0){
+            break;
         }
+    }
+    return NULL;
+}
+
+
+void* recieve_from_server(void* arg){
+    int socket = *(int*)arg;
+    char buff[MAX];
+    
+    while (1){
+        bzero(buff, MAX);
+        int bytes = read(socket, buff, MAX);
+        
+        // do nothing if the message is empty
+        if (bytes == -1){
+            break;
+        }
+        else{
+            printf("\nFrom Chat: %s", buff);
+        }
+        
+        fflush(stdout);
+    }
+    return NULL;
 }
 
 
 int main(){
-    // https://w3.cs.jmu.edu/kirkpams/OpenCSF/Books/csf/html/Sockets.html#:~:text=The%20socket%20interface%20in%20C,function%20call%20is%20the%20same.
-    
     
     // Step 1: Socket(s)
-    
     int client_socket;
     client_socket = socket(AF_INET, SOCK_STREAM, 0);  // Use TCP (would be SOCK_DGRAM for UDP)
     
@@ -81,17 +98,21 @@ int main(){
     }
     else{
         printf("connected to the server..\n");
+        printf("%d", client_socket);
     }
     
     
     // Step 3: Send message to server (to be sent to other clients)
     // Step 4: Receive messages from server (taken from other clients)
-    client_to_server(client_socket);
-    
-    
+    // make 2 threads, one for sending and one for recieving
+    pthread_t send_thread, recv_thread;
+    pthread_create(&send_thread, NULL, send_to_server, &client_socket);
+    pthread_create(&recv_thread, NULL, recieve_from_server, &client_socket);
+    pthread_join(send_thread, NULL);
+    pthread_cancel(recv_thread);
     
     // Step 5: Terminate if requested
     close(client_socket);
     
-    return 0;
+    return EXIT_SUCCESS;
 }

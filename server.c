@@ -26,45 +26,79 @@
 #include <sys/socket.h> 
 #include <sys/types.h> 
 #include <unistd.h> // read(), write(), close()
+#include <pthread.h>
 
 #define MAX_CLIENTS 4  // max number of connections to the server at a time
 #define PORT 8080  // port to connect to
 #define MAX 80  // max message size
 #define SA struct sockaddr
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 
-int client_connections[MAX_CLIENTS];
-int connected_clients = 0;
-void store_connection(int input_socket, int socket_number, int (*socket_list)[MAX_CLIENTS]){
-    (*socket_list)[socket_number] = input_socket;
-}
-
-struct connections{
-    int connection_number;
-    bool still_connected;
-    int socket;
+// connecitions and their managment
+struct connection{
+    bool still_connected;  // keep track whether or not the client is still active
+    int connection_number;  // keep track of what order people joined (probably unnecessary)
+    int socket;  // the socket that will be used to send/recieve on
+    // int thread;  // the thread that the socket is on (is this needed?)
 };
 
-void server_to_client(int socket){
+struct connection client_connection_array[MAX_CLIENTS];
+int connected_clients = 0;
+void store_connection(int input_socket, int socket_number, struct connection (*socket_list)[MAX_CLIENTS]){
+    (*socket_list)[socket_number].still_connected = true;
+    (*socket_list)[socket_number].connection_number = socket_number;
+    (*socket_list)[socket_number].socket = input_socket;
+}
+void break_connection(int input_socket, int socket_number, struct connection (*socket_list)[MAX_CLIENTS]){
+    (*socket_list)[socket_number].still_connected = false;
+    (*socket_list)[socket_number].connection_number = -1;
+    (*socket_list)[socket_number].socket = -1;
+}
+
+struct thread_args{
+    int socket;
+    int index;
+};
+
+
+// the "chat" part of the chatroom
+void* server_to_client(void* args){
+    struct thread_args* args = (struct thread_args*) args;
+    args -> socket = int socket;
+    args -> index = int socket_number;
     char buff[MAX]; 
-    int n; 
+    int n;
     
     for (;;){ 
         bzero(buff, MAX); 
         
         // read the message from client and copy it in buffer 
-        read(socket, buff, sizeof(buff)); 
+        int bytes_read = read(socket, buff, sizeof(buff));
+        if (bytes_read <= 0) {
+            printf("Client disconnected or error occurred. Closing connection.\n");
+            break_connection(socket, socket_number, &client_connection_array);
+            close(socket);
+            return;
+        }
         
         // print buffer which contains the client contents 
-        printf("From client: %s\t To client : ", buff); 
+        printf("From client: %d: %s\t", socket_number, buff); 
         bzero(buff, MAX); 
         
-        n = 0; 
-        // copy server message in the buffer 
-        while ((buff[n++] = getchar()) != '\n'); 
-        
         // and send that buffer to client 
-        write(socket, buff, sizeof(buff)); 
+        // loop through clients and send message to all connected clients (that didn't send the message)
+        for (int i = 0; i < connected_clients; i++){
+            printf("%d", client_connection_array[i].socket);
+            int socket_i = client_connection_array[i].socket;
+            if (client_connection_array[i].still_connected && (socket != socket_i)){
+                char message[14 + MAX];
+                // write(socket_i, message, sizeof(buff));
+                snprintf(message, sizeof(message), "Client %d says: %s", socket_number, buff);
+            }
+            // int socket_i = client_connection_array[i].socket;
+            // write(socket_i, buff, strlen(buff));
+        }
         
         // if msg contains "Exit" then server exit and chat ended. 
         if (strncmp("exit", buff, 4) == 0) { 
@@ -76,8 +110,6 @@ void server_to_client(int socket){
 
 
 int main(){
-    // https://w3.cs.jmu.edu/kirkpams/OpenCSF/Books/csf/html/Sockets.html#:~:text=The%20socket%20interface%20in%20C,function%20call%20is%20the%20same.
-    
     // Step 1: Socket(s) (and use Setsockopt?)
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     
@@ -92,41 +124,45 @@ int main(){
     int bound_socket = bind(sockfd, (SA*)&server_address, sizeof(server_address));;
     // check success of binding
     if (bound_socket != 0){
-        perror("Binding unsuccessful. Quitting.");
-        return -1;
+        perror("Binding unsuccessful.");
     }
     
     
     // Step 3: Listen
-    printf("Server is listening for new clients.");
+    // printf("Server is listening for new clients.");
     int listen_to_socket = listen(sockfd, 5);
     
     
-    // Step 4: Accept new clients (if possible)
-    struct sockaddr_in client; 
-    socklen_t len = sizeof(client);
-    int connection = accept(sockfd, (SA*)&client, &len); 
-    if (connection < 0){ 
-        perror("server accept failed...\n"); 
-        return -1;
-    }
-    else{
-        store_connection(connected_clients, connection, connected_clients);
-        connected_clients++;
-        printf("server accept the client...\n");
+    bool server_running = true;  // keep the server looping to keep accepting new clients
+    while (server_running){
         
+        // Step 4: Accept new clients (if possible)
+        struct sockaddr_in client; 
+        socklen_t len = sizeof(client);
+        int incoming_connection = accept(sockfd, (SA*)&client, &len);
+        // int index = incoming_connection;
+        pthread_mutex_lock(&lock);
+        if (incoming_connection < 0){ 
+            perror("Server accept failed...\n"); 
+        }
+        else if (connected_clients >= MAX_CLIENTS){
+            perror("Maximum number of clients already met.");
+            close(incoming_connection);
+        }
+        else{
+            struct thread_args* args = malloc(sizeof(struct thread_args));
+            args -> socket = incoming_connection;
+            args -> index = connected_clients;
+            store_connection(connected_clients, incoming_connection, &client_connection_array);
+            connected_clients++;
+            printf("Server accept the client...\n");
+        }
+        pthread_mutex_unlock(&lock);
+        
+        pthread_t tid;
+        pthread_create(&tid, NULL, (void*)server_to_client, (void*)(long)incoming_connection);
+        
+        printf("\n");
     }
-    
-    
-    // Step 5: Take input from client
-    // Step 6: Sent to other clients
-    server_to_client(connection);
-    
-    
-    // Step 7: Terminate if requested
-    close(connection);
-    
-    
-    printf("\n");
-    return 0;
+    return EXIT_SUCCESS;
 }
