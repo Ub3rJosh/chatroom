@@ -62,11 +62,12 @@ struct thread_args{
 };
 
 
+
 // the "chat" part of the chatroom
 void* server_to_client(void* args){
-    struct thread_args* args = (struct thread_args*) args;
-    args -> socket = int socket;
-    args -> index = int socket_number;
+    struct thread_args* given_args = (struct thread_args*) args;
+    int socket = given_args -> socket;
+    int socket_number = given_args -> index;
     char buff[MAX]; 
     int n;
     
@@ -79,33 +80,37 @@ void* server_to_client(void* args){
             printf("Client disconnected or error occurred. Closing connection.\n");
             break_connection(socket, socket_number, &client_connection_array);
             close(socket);
-            return;
+            break;
         }
         
         // print buffer which contains the client contents 
         printf("From client: %d: %s\t", socket_number, buff); 
-        bzero(buff, MAX); 
         
         // and send that buffer to client 
         // loop through clients and send message to all connected clients (that didn't send the message)
         for (int i = 0; i < connected_clients; i++){
-            printf("%d", client_connection_array[i].socket);
+            pthread_mutex_lock(&lock);
+            
+            printf("socket #%d: ", client_connection_array[i].socket);
             int socket_i = client_connection_array[i].socket;
             if (client_connection_array[i].still_connected && (socket != socket_i)){
                 char message[14 + MAX];
-                // write(socket_i, message, sizeof(buff));
                 snprintf(message, sizeof(message), "Client %d says: %s", socket_number, buff);
+                write(socket_i,  message, sizeof(message));
             }
-            // int socket_i = client_connection_array[i].socket;
-            // write(socket_i, buff, strlen(buff));
+            
+            pthread_mutex_unlock(&lock);
         }
         
         // if msg contains "Exit" then server exit and chat ended. 
         if (strncmp("exit", buff, 4) == 0) { 
             printf("Server Exit...\n"); 
             break; 
-        } 
+        }
+        bzero(buff, MAX); 
     }
+    free(given_args);
+    return NULL;
 }
 
 
@@ -153,14 +158,14 @@ int main(){
             struct thread_args* args = malloc(sizeof(struct thread_args));
             args -> socket = incoming_connection;
             args -> index = connected_clients;
-            store_connection(connected_clients, incoming_connection, &client_connection_array);
+            store_connection(incoming_connection, connected_clients, &client_connection_array);
             connected_clients++;
             printf("Server accept the client...\n");
+            pthread_mutex_unlock(&lock);
+            
+            pthread_t tid;
+            pthread_create(&tid, NULL, (void*)server_to_client, (void*)args);
         }
-        pthread_mutex_unlock(&lock);
-        
-        pthread_t tid;
-        pthread_create(&tid, NULL, (void*)server_to_client, (void*)(long)incoming_connection);
         
         printf("\n");
     }

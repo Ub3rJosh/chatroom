@@ -54,7 +54,6 @@ void* recieve_from_server(void* arg){
     char buff[MAX];
     
     while (1){
-        bzero(buff, MAX);
         int bytes = read(socket, buff, MAX);
         
         // do nothing if the message is empty
@@ -66,6 +65,7 @@ void* recieve_from_server(void* arg){
         }
         
         fflush(stdout);
+        bzero(buff, MAX);
     }
     return NULL;
 }
