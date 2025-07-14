@@ -36,11 +36,11 @@
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 
-// connecitions and their managment
+// connections and their management
 struct connection{
     bool still_connected;      // keep track whether or not the client is still active
     int connection_number;     // keep track of what order people joined (probably unnecessary)
-    int socket;                // the socket that will be used to send/recieve on
+    int socket;                // the socket that will be used to send/receive on
     char username[NAME_SIZE];  // user-defined username
 };
 
@@ -76,7 +76,7 @@ void* server_to_client(void* args){
     
     
     for (;;){ 
-        // bzero(buff, MAX);
+        bzero(buff, MAX);
         
         // read the message from client and copy it in buffer 
         int bytes_read = read(socket, buff, sizeof(buff));
@@ -97,11 +97,11 @@ void* server_to_client(void* args){
             pthread_mutex_lock(&lock);  // keep the threads behaving
             
             // send the message to all threads that did not send message
+            char message[14 + MAX];
             int socket_i = client_connection_array[i].socket;
             if (client_connection_array[i].still_connected && (socket != socket_i)){
-                char message[14 + MAX];
                 snprintf(message, sizeof(message), "Client %d says: %s", socket_number, buff);
-                write(socket_i,  message, sizeof(message));
+                write(socket_i,  message, strlen(message) + 1);
             }
             
             pthread_mutex_unlock(&lock);  // free thread
@@ -111,8 +111,6 @@ void* server_to_client(void* args){
         if (strncmp("exit", buff, 4) == 0) { 
             printf("Server Exit...\n"); 
             break; 
-        
-        bzero(buff, MAX); // clear buff after it's used.
         }
     }
     free(given_args);

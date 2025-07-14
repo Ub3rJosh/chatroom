@@ -52,7 +52,7 @@ void* send_to_server(void* arg){
 }
 
 
-void* recieve_from_server(void* arg){
+void* receive_from_server(void* arg){
     int socket = *(int*)arg;
     char buff[MAX];
     
@@ -62,6 +62,9 @@ void* recieve_from_server(void* arg){
         // do nothing if the message is empty
         if (bytes == -1){
             break;
+        }
+        else{
+            printf("%s", buff);
         }
         
         fflush(stdout);
@@ -107,7 +110,7 @@ int main(){
     // make 2 threads, one for sending and one for recieving
     pthread_t send_thread, recv_thread;
     pthread_create(&send_thread, NULL, send_to_server, &client_socket);
-    pthread_create(&recv_thread, NULL, recieve_from_server, &client_socket);
+    pthread_create(&recv_thread, NULL, receive_from_server, &client_socket);
     pthread_join(send_thread, NULL);
     pthread_cancel(recv_thread);
     
