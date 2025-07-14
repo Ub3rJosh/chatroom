@@ -31,18 +31,20 @@
 #define MAX_CLIENTS 4  // max number of connections to the server at a time
 #define PORT 8080  // port to connect to
 #define MAX 80  // max message size
+#define NAME_SIZE 12  // max size for usernames
 #define SA struct sockaddr
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 
 // connecitions and their managment
 struct connection{
-    bool still_connected;  // keep track whether or not the client is still active
-    int connection_number;  // keep track of what order people joined (probably unnecessary)
-    int socket;  // the socket that will be used to send/recieve on
-    // int thread;  // the thread that the socket is on (is this needed?)
+    bool still_connected;      // keep track whether or not the client is still active
+    int connection_number;     // keep track of what order people joined (probably unnecessary)
+    int socket;                // the socket that will be used to send/recieve on
+    char username[NAME_SIZE];  // user-defined username
 };
 
+// keep track of connections and clients through `client_connection_array` and `connected_clients`
 struct connection client_connection_array[MAX_CLIENTS];
 int connected_clients = 0;
 void store_connection(int input_socket, int socket_number, struct connection (*socket_list)[MAX_CLIENTS]){
@@ -68,11 +70,13 @@ void* server_to_client(void* args){
     struct thread_args* given_args = (struct thread_args*) args;
     int socket = given_args -> socket;
     int socket_number = given_args -> index;
+    
     char buff[MAX]; 
     int n;
     
+    
     for (;;){ 
-        bzero(buff, MAX); 
+        // bzero(buff, MAX);
         
         // read the message from client and copy it in buffer 
         int bytes_read = read(socket, buff, sizeof(buff));
@@ -85,13 +89,14 @@ void* server_to_client(void* args){
         
         // print buffer which contains the client contents 
         printf("From client: %d: %s\t", socket_number, buff); 
+        // fflush(stdout);
         
         // and send that buffer to client 
         // loop through clients and send message to all connected clients (that didn't send the message)
         for (int i = 0; i < connected_clients; i++){
-            pthread_mutex_lock(&lock);
+            pthread_mutex_lock(&lock);  // keep the threads behaving
             
-            printf("socket #%d: ", client_connection_array[i].socket);
+            // send the message to all threads that did not send message
             int socket_i = client_connection_array[i].socket;
             if (client_connection_array[i].still_connected && (socket != socket_i)){
                 char message[14 + MAX];
@@ -99,15 +104,16 @@ void* server_to_client(void* args){
                 write(socket_i,  message, sizeof(message));
             }
             
-            pthread_mutex_unlock(&lock);
+            pthread_mutex_unlock(&lock);  // free thread
         }
         
         // if msg contains "Exit" then server exit and chat ended. 
         if (strncmp("exit", buff, 4) == 0) { 
             printf("Server Exit...\n"); 
             break; 
+        
+        bzero(buff, MAX); // clear buff after it's used.
         }
-        bzero(buff, MAX); 
     }
     free(given_args);
     return NULL;
@@ -145,15 +151,18 @@ int main(){
         struct sockaddr_in client; 
         socklen_t len = sizeof(client);
         int incoming_connection = accept(sockfd, (SA*)&client, &len);
-        // int index = incoming_connection;
         pthread_mutex_lock(&lock);
-        if (incoming_connection < 0){ 
+        
+        // see if there's something bad happening with the sockets
+        if (incoming_connection < 0){
             perror("Server accept failed...\n"); 
         }
+        // see if the server is at it's max number of clients already
         else if (connected_clients >= MAX_CLIENTS){
             perror("Maximum number of clients already met.");
             close(incoming_connection);
         }
+        // if there's no reason not to, accept the client
         else{
             struct thread_args* args = malloc(sizeof(struct thread_args));
             args -> socket = incoming_connection;

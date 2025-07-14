@@ -26,6 +26,7 @@
 
 #define PORT 8080  // port to connect to
 #define MAX 80  // max chars in a message
+#define NAME_SIZE 12  // max size for usernames
 #define SA struct sockaddr
 
 
@@ -39,6 +40,8 @@ void* send_to_server(void* arg){
         
         fgets(buff, MAX, stdin);  // take in message
         write(socket, buff, strlen(buff));  // write message
+        
+        // memset(buff, 0, MAX);
         
         // exit if that's what we want
         if (strncmp(buff, "exit", 4) == 0){
@@ -59,9 +62,6 @@ void* recieve_from_server(void* arg){
         // do nothing if the message is empty
         if (bytes == -1){
             break;
-        }
-        else{
-            printf("\nFrom Chat: %s", buff);
         }
         
         fflush(stdout);
@@ -98,7 +98,7 @@ int main(){
     }
     else{
         printf("connected to the server..\n");
-        printf("%d", client_socket);
+        // printf("%d", client_socket);
     }
     
     
