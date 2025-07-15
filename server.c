@@ -47,15 +47,22 @@ struct connection{
 // keep track of connections and clients through `client_connection_array` and `connected_clients`
 struct connection client_connection_array[MAX_CLIENTS];
 int connected_clients = 0;
-void store_connection(int input_socket, int socket_number, struct connection (*socket_list)[MAX_CLIENTS]){
+void store_connection(int input_socket, 
+                      int socket_number, 
+                      struct connection (*socket_list)[MAX_CLIENTS]){
     (*socket_list)[socket_number].still_connected = true;
     (*socket_list)[socket_number].connection_number = socket_number;
     (*socket_list)[socket_number].socket = input_socket;
 }
-void break_connection(int input_socket, int socket_number, struct connection (*socket_list)[MAX_CLIENTS]){
+
+void break_connection(int input_socket, 
+                      int socket_number, 
+                      struct connection (*socket_list)[MAX_CLIENTS]){
+    // clean up struct
     (*socket_list)[socket_number].still_connected = false;
     (*socket_list)[socket_number].connection_number = -1;
     (*socket_list)[socket_number].socket = -1;
+    bzero((*socket_list)[socket_number].username, NAME_SIZE);
 }
 
 struct thread_args{
@@ -74,6 +81,13 @@ void* server_to_client(void* args){
     char buff[MAX]; 
     int n;
     
+    // read in username
+    char username[NAME_SIZE];
+    read(socket, &username, sizeof(username));
+    strcpy(client_connection_array[socket_number].username, username);
+    printf("%d's username is %s\n", socket_number, username);
+    
+    
     
     for (;;){ 
         bzero(buff, MAX);
@@ -88,7 +102,7 @@ void* server_to_client(void* args){
         }
         
         // print buffer which contains the client contents 
-        printf("From client: %d: %s\t", socket_number, buff); 
+        printf("From client: %d (%s): %s\t", socket_number, client_connection_array[socket_number].username, buff); 
         // fflush(stdout);
         
         // and send that buffer to client 
@@ -97,11 +111,13 @@ void* server_to_client(void* args){
             pthread_mutex_lock(&lock);  // keep the threads behaving
             
             // send the message to all threads that did not send message
-            char message[14 + MAX];
+            char message[15 + MAX + NAME_SIZE];
             int socket_i = client_connection_array[i].socket;
             if (client_connection_array[i].still_connected && (socket != socket_i)){
-                snprintf(message, sizeof(message), "Client %d says: %s", socket_number, buff);
-                write(socket_i,  message, strlen(message) + 1);
+                snprintf(message, sizeof(message), "%s: %s|", 
+                         client_connection_array[socket_number].username, buff);
+                // write(socket_i,  message, strlen(message) + 1);
+                write(socket_i,  message, sizeof(message));
             }
             
             pthread_mutex_unlock(&lock);  // free thread
@@ -116,6 +132,7 @@ void* server_to_client(void* args){
     free(given_args);
     return NULL;
 }
+
 
 
 int main(){
@@ -166,6 +183,8 @@ int main(){
             args -> socket = incoming_connection;
             args -> index = connected_clients;
             store_connection(incoming_connection, connected_clients, &client_connection_array);
+            // also get the username
+            
             connected_clients++;
             printf("Server accept the client...\n");
             pthread_mutex_unlock(&lock);

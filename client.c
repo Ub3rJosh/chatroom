@@ -13,6 +13,7 @@
 */
 
 #include <stdio.h> 
+#include <stdbool.h>
 #include <arpa/inet.h>
 #include <netdb.h> 
 #include <netinet/in.h> 
@@ -30,18 +31,32 @@
 #define SA struct sockaddr
 
 
-void* send_to_server(void* arg){
-    int socket = *(int*)arg;
+// get name (and any other info?) from client on connection
+struct definition{
+    char username[NAME_SIZE];
+    // char role[ROLE_SIZE] = admin;  // or something idk
+    // char bio[BIO_SIZE];  // or something idk
+};
+struct client_args{
+    int socket;
+    struct definition who_is_this;
+};
+
+
+void* send_to_server(void* args){
+    struct client_args* given_args = (struct client_args*) args;
+    int socket = (int) given_args -> socket;
+    char username = *(char*) given_args -> who_is_this.username;
+    
     char buff[MAX];
+    
     
     while (1){
         bzero(buff, MAX);
-        printf("You: ");
+        // printf("You: ");
         
         fgets(buff, MAX, stdin);  // take in message
         write(socket, buff, strlen(buff));  // write message
-        
-        // memset(buff, 0, MAX);
         
         // exit if that's what we want
         if (strncmp(buff, "exit", 4) == 0){
@@ -50,7 +65,6 @@ void* send_to_server(void* arg){
     }
     return NULL;
 }
-
 
 void* receive_from_server(void* arg){
     int socket = *(int*)arg;
@@ -65,6 +79,7 @@ void* receive_from_server(void* arg){
         }
         else{
             printf("%s", buff);
+            printf("\n");
         }
         
         fflush(stdout);
@@ -72,6 +87,19 @@ void* receive_from_server(void* arg){
     }
     return NULL;
 }
+
+struct definition ask_to_define_self(){
+    char name[NAME_SIZE];
+    
+    printf("Enter username: ");
+    scanf("%s", name); 
+    
+    struct definition who_am_i;
+    strcpy(who_am_i.username, name);
+    
+    return who_am_i;
+}
+
 
 
 int main(){
@@ -104,10 +132,21 @@ int main(){
         // printf("%d", client_socket);
     }
     
+    // get username
+    struct definition self_definition = ask_to_define_self();
+    // and send it
+    printf("username = %s", self_definition.username);
+    write(client_socket, self_definition.username, strlen(self_definition.username));
+    
     
     // Step 3: Send message to server (to be sent to other clients)
     // Step 4: Receive messages from server (taken from other clients)
-    // make 2 threads, one for sending and one for recieving
+    
+    // make args
+    struct client_args args;
+    args.socket = client_socket;
+    
+    // make 2 threads, one for sending and one for receiving
     pthread_t send_thread, recv_thread;
     pthread_create(&send_thread, NULL, send_to_server, &client_socket);
     pthread_create(&recv_thread, NULL, receive_from_server, &client_socket);
