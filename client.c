@@ -53,15 +53,15 @@ void* send_to_server(void* args){
     
     while (1){
         bzero(buff, MAX);
-        // printf("You: ");
         
         fgets(buff, MAX, stdin);  // take in message
+       
         // write message unless it's am empty message
-        if (buff[0] != '\0'){
+        if (buff[0] != '\n'){
             write(socket, buff, strlen(buff));
         }
         else{
-            printf("/r");  // go back to the beginning of the line.
+            printf("\x1B[A");  // remove new line (this might not be widely supported)
         }
         
         // exit if that's what we want
