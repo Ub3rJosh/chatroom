@@ -25,9 +25,8 @@
 #include <sys/socket.h>
 #include <pthread.h>
 
-#define PORT 8080  // port to connect to
-#define MAX 80  // max chars in a message
-#define NAME_SIZE 12  // max size for usernames
+#include "chat_specs.h"
+
 #define SA struct sockaddr
 
 
@@ -98,7 +97,9 @@ struct definition ask_to_define_self(){
     char name[NAME_SIZE];
     
     printf("Enter username: ");
-    scanf("%s", name); 
+    scanf("%[^\n]s", name);
+    
+    printf("\n\n");  // fix removing new line chars
     
     struct definition who_am_i;
     strcpy(who_am_i.username, name);
@@ -142,7 +143,7 @@ int main(){
     struct definition self_definition = ask_to_define_self();
     // and send it
     printf("username = %s", self_definition.username);
-    write(client_socket, self_definition.username, strlen(self_definition.username));
+    write(client_socket, self_definition.username, sizeof(self_definition.username));
     
     
     // Step 3: Send message to server (to be sent to other clients)

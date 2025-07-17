@@ -28,10 +28,8 @@
 #include <unistd.h>
 #include <pthread.h>
 
-#define MAX_CLIENTS 4  // max number of connections to the server at a time
-#define PORT 8080  // port to connect to
-#define MAX 80  // max message size
-#define NAME_SIZE 12  // max size for usernames
+#include "chat_specs.h"
+
 #define SA struct sockaddr
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
