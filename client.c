@@ -21,7 +21,7 @@
 #include <string.h> 
 #include <sys/socket.h> 
 #include <sys/types.h> 
-#include <unistd.h> // read(), write(), close()
+#include <unistd.h>
 #include <sys/socket.h>
 #include <pthread.h>
 
@@ -56,7 +56,13 @@ void* send_to_server(void* args){
         // printf("You: ");
         
         fgets(buff, MAX, stdin);  // take in message
-        write(socket, buff, strlen(buff));  // write message
+        // write message unless it's am empty message
+        if (buff[0] != '\0'){
+            write(socket, buff, strlen(buff));
+        }
+        else{
+            printf("/r");  // go back to the beginning of the line.
+        }
         
         // exit if that's what we want
         if (strncmp(buff, "exit", 4) == 0){

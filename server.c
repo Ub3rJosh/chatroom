@@ -25,7 +25,7 @@
 #include <string.h> 
 #include <sys/socket.h> 
 #include <sys/types.h> 
-#include <unistd.h> // read(), write(), close()
+#include <unistd.h>
 #include <pthread.h>
 
 #define MAX_CLIENTS 4  // max number of connections to the server at a time
@@ -85,10 +85,11 @@ void* server_to_client(void* args){
     char username[NAME_SIZE];
     read(socket, &username, sizeof(username));
     strcpy(client_connection_array[socket_number].username, username);
-    printf("%d's username is %s\n", socket_number, username);
+    printf("%d's username is %s", socket_number, username);
+    printf("");
     
     
-    
+    // Loop for actually running the chat
     for (;;){ 
         bzero(buff, MAX);
         
@@ -101,6 +102,24 @@ void* server_to_client(void* args){
             break;
         }
         
+        // if msg contains "Exit" then server exit and chat ended. 
+        if (strncmp("exit", buff, 4) == 0) { 
+            printf("Server Exit...\n"); 
+            
+            // send message stating disconnect
+            for (int i = 0; i < connected_clients; i++){
+                pthread_mutex_lock(&lock);  // keep the threads behaving
+                
+                int socket_i = client_connection_array[i].socket;
+                char exit_message[NAME_SIZE + 6];
+                snprintf(exit_message, sizeof(exit_message), "%s left.", client_connection_array[socket_number].username);
+                write(socket_i, exit_message, sizeof(exit_message));
+                
+                pthread_mutex_unlock(&lock);  // free thread
+            }
+            break; 
+        }
+        
         // print buffer which contains the client contents 
         printf("From client: %d (%s): %s\t", socket_number, client_connection_array[socket_number].username, buff); 
         // fflush(stdout);
@@ -111,22 +130,16 @@ void* server_to_client(void* args){
             pthread_mutex_lock(&lock);  // keep the threads behaving
             
             // send the message to all threads that did not send message
-            char message[15 + MAX + NAME_SIZE];
+            char message[14 + MAX + NAME_SIZE];
             int socket_i = client_connection_array[i].socket;
             if (client_connection_array[i].still_connected && (socket != socket_i)){
-                snprintf(message, sizeof(message), "%s: %s|", 
+                snprintf(message, sizeof(message), "%s: %s", 
                          client_connection_array[socket_number].username, buff);
                 // write(socket_i,  message, strlen(message) + 1);
                 write(socket_i,  message, sizeof(message));
             }
             
             pthread_mutex_unlock(&lock);  // free thread
-        }
-        
-        // if msg contains "Exit" then server exit and chat ended. 
-        if (strncmp("exit", buff, 4) == 0) { 
-            printf("Server Exit...\n"); 
-            break; 
         }
     }
     free(given_args);
