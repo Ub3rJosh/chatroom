@@ -83,8 +83,7 @@ void* server_to_client(void* args){
     char username[NAME_SIZE];
     read(socket, &username, sizeof(username));
     strcpy(client_connection_array[socket_number].username, username);
-    printf("%d's username is %s", socket_number, username);
-    printf("");
+    printf("Client %d's username is %s\n", socket_number, username);
     
     
     // Loop for actually running the chat
@@ -94,7 +93,7 @@ void* server_to_client(void* args){
         // read the message from client and copy it in buffer 
         int bytes_read = read(socket, buff, sizeof(buff));
         if (bytes_read <= 0) {
-            printf("Client disconnected or error occurred. Closing connection.\n");
+            printf("Client disconnected or error occurred. Closing connection.");
             break_connection(socket, socket_number, &client_connection_array);
             close(socket);
             break;
@@ -102,7 +101,7 @@ void* server_to_client(void* args){
         
         // if msg contains "Exit" then server exit and chat ended. 
         if (strncmp("exit", buff, 4) == 0) { 
-            printf("Server Exit...\n"); 
+            printf("Server Exit..."); 
             
             // send message stating disconnect
             for (int i = 0; i < connected_clients; i++){
@@ -110,7 +109,8 @@ void* server_to_client(void* args){
                 
                 int socket_i = client_connection_array[i].socket;
                 char exit_message[NAME_SIZE + 6];
-                snprintf(exit_message, sizeof(exit_message), "%s left.", client_connection_array[socket_number].username);
+                snprintf(exit_message, sizeof(exit_message), "%s left.\n", client_connection_array[socket_number].username);
+                printf("%s", exit_message);
                 write(socket_i, exit_message, sizeof(exit_message));
                 
                 pthread_mutex_unlock(&lock);  // free thread
@@ -119,8 +119,7 @@ void* server_to_client(void* args){
         }
         
         // print buffer which contains the client contents 
-        printf("From client: %d (%s): %s\t", socket_number, client_connection_array[socket_number].username, buff); 
-        // fflush(stdout);
+        printf("From client %d (%s): %s", socket_number, client_connection_array[socket_number].username, buff); 
         
         // and send that buffer to client 
         // loop through clients and send message to all connected clients (that didn't send the message)
@@ -133,7 +132,6 @@ void* server_to_client(void* args){
             if (client_connection_array[i].still_connected && (socket != socket_i)){
                 snprintf(message, sizeof(message), "%s: %s", 
                          client_connection_array[socket_number].username, buff);
-                // write(socket_i,  message, strlen(message) + 1);
                 write(socket_i,  message, sizeof(message));
             }
             
@@ -181,7 +179,7 @@ int main(){
         
         // see if there's something bad happening with the sockets
         if (incoming_connection < 0){
-            perror("Server accept failed...\n"); 
+            perror("Server accept failed..."); 
         }
         // see if the server is at it's max number of clients already
         else if (connected_clients >= MAX_CLIENTS){
@@ -197,14 +195,13 @@ int main(){
             // also get the username
             
             connected_clients++;
-            printf("Server accept the client...\n");
+            printf("Server accepted client.\n");
             pthread_mutex_unlock(&lock);
             
             pthread_t tid;
             pthread_create(&tid, NULL, (void*)server_to_client, (void*)args);
         }
-        
-        printf("\n");
     }
+    
     return EXIT_SUCCESS;
 }

@@ -24,6 +24,7 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <pthread.h>
+#include <curses.h>
 
 #include "chat_specs.h"
 
@@ -49,18 +50,24 @@ void* send_to_server(void* args){
     
     char buff[MAX];
     
-    
     while (1){
         bzero(buff, MAX);
         
         fgets(buff, MAX, stdin);  // take in message
        
         // write message unless it's am empty message
+        int free_newline = 1;
         if (buff[0] != '\n'){
+            printf("\r");  // remove the "You: " in the chat
             write(socket, buff, strlen(buff));
         }
         else{
-            printf("\x1B[A");  // remove new line (this might not be widely supported)
+            if (free_newline > 0){
+                free_newline--;
+            }
+            else{
+                printf("\x1B[A");  // remove new line (this might not be widely supported)
+            }
         }
         
         // exit if that's what we want
@@ -78,13 +85,21 @@ void* receive_from_server(void* arg){
     while (1){
         int bytes = read(socket, buff, MAX);
         
-        // do nothing if the message is empty
-        if (bytes == -1){
+        if (bytes == -1){  // disconnection
             break;
         }
         else{
-            printf("%s", buff);
-            printf("\n");
+            // undo "You: " formatting
+            // printf("\x1b[2K");
+            // printf("\x1B[A");
+            printf("\x1b[2K");
+            printf("\x1B[A");
+            
+            fflush(stdout);
+            printf("\r%s", buff);  // show message
+            
+            fflush(stdout);
+            printf("\n\nYou: ");  // redo "You: " formatting
         }
         
         fflush(stdout);
@@ -98,8 +113,6 @@ struct definition ask_to_define_self(){
     
     printf("Enter username: ");
     scanf("%[^\n]s", name);
-    
-    printf("\n\n");  // fix removing new line chars
     
     struct definition who_am_i;
     strcpy(who_am_i.username, name);
@@ -118,7 +131,7 @@ int main(){
     // check success of socket creation
     if (client_socket == -1){
         printf("Socket not created. Quitting.");
-        return -1;
+        return EXIT_FAILURE;
     }
     
     
@@ -131,12 +144,11 @@ int main(){
     
     // breaks at this if statement
     if (connect(client_socket, (SA*)&server_address, sizeof(server_address)) != 0){
-        printf("connection with the server failed...\n");
-        return -1;
+        printf("Connection with the server failed.");
+        return EXIT_FAILURE;
     }
     else{
-        printf("connected to the server..\n");
-        // printf("%d", client_socket);
+        printf("Connected to the server.\n");
     }
     
     // get username
@@ -144,12 +156,13 @@ int main(){
     // and send it
     printf("username = %s", self_definition.username);
     write(client_socket, self_definition.username, sizeof(self_definition.username));
-    
+    printf("\n\n");
+    printf("\n\nYou: ");  // "You: " formatting
     
     // Step 3: Send message to server (to be sent to other clients)
     // Step 4: Receive messages from server (taken from other clients)
     
-    // make args
+    // make args for threads
     struct client_args args;
     args.socket = client_socket;
     
