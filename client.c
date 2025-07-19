@@ -50,28 +50,41 @@ void* send_to_server(void* args){
     
     char buff[MAX];
     
+    int free_newline = 1;
     while (1){
         bzero(buff, MAX);
         
         fgets(buff, MAX, stdin);  // take in message
        
         // write message unless it's am empty message
-        int free_newline = 1;
         if (buff[0] != '\n'){
-            printf("\r");  // remove the "You: " in the chat
-            write(socket, buff, strlen(buff));
+            // remove the "You: " in the chat
+            // printf("\x1b[2K\x1B[A");
+            printf("\x1b[2K\x1B[A\x1B[A");
+            fflush(stdout);
+            
+            write(socket, buff, strlen(buff));  // write message
+            fflush(stdout);
+            
+            printf("\n\nYou: ");  // redo "You: " formatting
+            fflush(stdout);
         }
         else{
             if (free_newline > 0){
                 free_newline--;
+                // printf("free_newline = %i", free_newline);
             }
             else{
+                printf("\x1b[2K");
                 printf("\x1B[A");  // remove new line (this might not be widely supported)
+                printf("You: ");
+                fflush(stdout);
             }
         }
         
         // exit if that's what we want
         if (strncmp(buff, "exit", 4) == 0){
+            printf("\n");
             break;
         }
     }
@@ -90,16 +103,13 @@ void* receive_from_server(void* arg){
         }
         else{
             // undo "You: " formatting
-            // printf("\x1b[2K");
-            // printf("\x1B[A");
-            printf("\x1b[2K");
-            printf("\x1B[A");
+            printf("\x1b[2K\x1B[A\x1b[2K");
             
             fflush(stdout);
             printf("\r%s", buff);  // show message
             
             fflush(stdout);
-            printf("\n\nYou: ");  // redo "You: " formatting
+            printf("\nYou: ");  // redo "You: " formatting
         }
         
         fflush(stdout);
@@ -154,9 +164,8 @@ int main(){
     // get username
     struct definition self_definition = ask_to_define_self();
     // and send it
-    printf("username = %s", self_definition.username);
+    // printf("username = %s", self_definition.username);
     write(client_socket, self_definition.username, sizeof(self_definition.username));
-    printf("\n\n");
     printf("\n\nYou: ");  // "You: " formatting
     
     // Step 3: Send message to server (to be sent to other clients)
