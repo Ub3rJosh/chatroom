@@ -37,6 +37,7 @@ pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 // connections and their management
 struct connection{
     bool still_connected;      // keep track whether or not the client is still active
+    // bool sent_last;            // keep track of which client sent the last message
     int connection_number;     // keep track of what order people joined (probably unnecessary)
     int socket;                // the socket that will be used to send/receive on
     char username[NAME_SIZE];  // user-defined username
