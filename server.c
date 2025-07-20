@@ -37,7 +37,6 @@ pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 // connections and their management
 struct connection{
     bool still_connected;      // keep track whether or not the client is still active
-    // bool sent_last;            // keep track of which client sent the last message
     int connection_number;     // keep track of what order people joined (probably unnecessary)
     int socket;                // the socket that will be used to send/receive on
     char username[NAME_SIZE];  // user-defined username
@@ -64,6 +63,7 @@ void break_connection(int input_socket,
     bzero((*socket_list)[socket_number].username, NAME_SIZE);
 }
 
+// define struct for thread args
 struct thread_args{
     int socket;
     int index;
@@ -73,12 +73,12 @@ struct thread_args{
 
 // the "chat" part of the chatroom
 void* server_to_client(void* args){
+    // handle args
     struct thread_args* given_args = (struct thread_args*) args;
     int socket = given_args -> socket;
     int socket_number = given_args -> index;
     
-    char buff[MAX]; 
-    int n;
+    char buff[MAX];  // define message variable
     
     // read in username
     char username[NAME_SIZE];
@@ -139,7 +139,7 @@ void* server_to_client(void* args){
             pthread_mutex_unlock(&lock);  // free thread
         }
     }
-    free(given_args);
+    free(given_args);  // malloc'd in else statement of server_running while loop in main
     return NULL;
 }
 
@@ -189,11 +189,10 @@ int main(){
         }
         // if there's no reason not to, accept the client
         else{
-            struct thread_args* args = malloc(sizeof(struct thread_args));
+            struct thread_args* args = malloc(sizeof(struct thread_args));  // to be freed in server_to_client()
             args -> socket = incoming_connection;
             args -> index = connected_clients;
             store_connection(incoming_connection, connected_clients, &client_connection_array);
-            // also get the username
             
             connected_clients++;
             printf("Server accepted client.\n");

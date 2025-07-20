@@ -37,55 +37,46 @@ struct definition{
     // char role[ROLE_SIZE] = admin;  // or something idk
     // char bio[BIO_SIZE];  // or something idk
 };
+
+// define struct for client args
 struct client_args{
     int socket;
-    bool sent_last;
     struct definition who_is_this;
 };
 
 
 void* send_to_server(void* args){
+    // handle args
     struct client_args* given_args = (struct client_args*) args;
     int socket = (int) given_args -> socket;
-    bool sent_last = (bool) given_args -> sent_last;
     char username = *(char*) given_args -> who_is_this.username;
     
-    char buff[MAX];
+    char buff[MAX];  // define message variable
     
-    int free_newline = 0;
+    // scan for messages
+    int free_enters = 1;
     while (1){
         bzero(buff, MAX);
-        
         fgets(buff, MAX, stdin);  // take in message
        
         // write message unless it's am empty message
         if (buff[0] != '\n'){
-            // remove the "You: " in the chat
-            // printf("\033[K\x1B[A");
-            // printf("\x1b[2K\x1b[2K");
-            // fflush(stdout);
+            buff[strcspn(buff, "\n") + 1] = '\0';  // trim message at new line char
             
             write(socket, buff, strlen(buff));  // write message
             fflush(stdout);
             
-            printf("You: ");  // redo "You: " formatting
+            printf("\rYou: ");  // redo "You: " formatting
             fflush(stdout);
-            
-            // printf("sent_last (before send) = %i", given_args -> sent_last);
-            // given_args -> sent_last = true;  // keep track of if this client sent last message
-            // printf("sent_last (after send) = %i\n", given_args -> sent_last);
         }
         else{
-            if (free_newline > 0){
-                free_newline--;
-                // printf("free_newline = %i", free_newline);
+            if (free_enters > 0){
+                free_enters--;
             }
             else{
-                // printf("\x1b[2K");
-                // printf("\x1B[A");  // remove new line (this might not be widely supported)
-                // printf("You: ");
-                // fflush(stdout);
-            }
+                printf("\x1B[A");
+                printf("\rYou: ");  // redo "You: " formatting
+        }
         }
         
         // exit if that's what we want
@@ -98,13 +89,14 @@ void* send_to_server(void* args){
 }
 
 void* receive_from_server(void* args){
+    // handle args
     struct client_args* given_args = (struct client_args*) args;
     int socket = (int) given_args -> socket;
-    bool sent_last = (bool) given_args -> sent_last;
     char username = *(char*) given_args -> who_is_this.username;
     
-    char buff[MAX];
+    char buff[MAX];  // define message variable
 
+    // scan for messages
     while (1){
         int bytes = read(socket, buff, MAX);
         
@@ -112,19 +104,11 @@ void* receive_from_server(void* args){
             break;
         }
         else{
-            // undo "You: " formatting
-            // printf("\x1b[2K\x1B[A\x1b[2K");
-            // fflush(stdout);
-            
-            printf("\x1b[2K%s", buff);  // show message on a cleared line
+            printf("\r%s", buff);  // show message on a cleared line
             fflush(stdout);
             
-            printf("You: ");  // redo "You: " formatting
+            printf("\rYou: ");  // redo "You: " formatting
             fflush(stdout);
-            
-            // printf("sent_last (before get) = %i", given_args -> sent_last);
-            // given_args -> sent_last = false;  // keep track of if this client sent last message
-            // printf("sent_last (after get) = %i\n", given_args -> sent_last);
         }
         
         bzero(buff, MAX);
@@ -180,15 +164,14 @@ int main(){
     // and send it
     // printf("username = %s", self_definition.username);
     write(client_socket, self_definition.username, sizeof(self_definition.username));
-    printf("\n\n\rYou: ");  // "You: " formatting
+    printf("\n\rYou: ");  // "You: " formatting
+    
     
     // Step 3: Send message to server (to be sent to other clients)
     // Step 4: Receive messages from server (taken from other clients)
-    
     // make args for threads
     struct client_args args;
     args.socket = client_socket;
-    args.sent_last = true;
     
     // make 2 threads, one for sending and one for receiving
     pthread_t send_thread, recv_thread;
