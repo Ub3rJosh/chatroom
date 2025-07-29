@@ -70,6 +70,37 @@ struct thread_args{
 };
 
 
+int parse_command(char *given_string){
+    /* 
+       0 <-> whisper
+       1 <-> disconnect / exit
+       2 <-> TBD
+    */
+    
+    // parse argument
+    int end_index = 0;
+    for (int i = 0; i < strlen(given_string); i++){
+        if (given_string[i] == ' '){
+            end_index = i;
+            break;
+        }
+    }
+    char command[COMMAND_SIZE];
+    strncpy(command, given_string, end_index);
+    
+    // find the int associated with each commant
+    if (strcmp(command, "whisper") == 0){
+        return 0;
+    }
+    else if (strcmp(command, "exit") == 0){
+        return 1;
+    }
+    else{
+        return -1;  // fail case 
+    }
+}
+
+
 
 // the "chat" part of the chatroom
 void* server_to_client(void* args){
@@ -119,6 +150,14 @@ void* server_to_client(void* args){
             break; 
         }
         
+        // // check to see if there's a whisper (@whisper "Test 2")
+        // if (buff[0] == "@"){  // command being used
+            
+        //     // make sure that the name being whispered to exits
+            
+        // }
+        
+        // if not whispering
         // print buffer which contains the client contents 
         printf("From client %d (%s): %s", socket_number, client_connection_array[socket_number].username, buff); 
         
