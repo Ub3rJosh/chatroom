@@ -70,12 +70,21 @@ struct thread_args{
 };
 
 
+// takes in the message that may have a command in it
+// returns the int that corresponds to various commands
 int parse_command(char *given_string){
     /* 
        0 <-> whisper
        1 <-> disconnect / exit
        2 <-> TBD
+       
+       -1 <-> fail
     */
+   
+    // if there is no command given then return fail case
+    if (given_string[0] != '@'){
+        return -1;
+    }
     
     // parse argument
     int end_index = 0;
@@ -88,18 +97,50 @@ int parse_command(char *given_string){
     char command[COMMAND_SIZE];
     strncpy(command, given_string, end_index);
     
+    printf("input command: %s", command);
+    
     // find the int associated with each commant
-    if (strcmp(command, "whisper") == 0){
+    if (strcmp(command, "@whisper") == 0){
         return 0;
     }
-    else if (strcmp(command, "exit") == 0){
+    else if (strcmp(command, "@exit") == 0){
         return 1;
     }
     else{
+        printf("command unknown: %s", command);
         return -1;  // fail case 
     }
 }
 
+
+// takes in the message that may have a command in it
+// returns the socket number of the person being whispered to
+int parse_whisper(char *given_string){
+    // parse argument and grab name
+    bool finding_first = true;
+    int start_index = 0;
+    int end_index = 0;
+    for (int i = 0; i < strlen(given_string); i++){
+        if (given_string[i] == ' '){
+            if (finding_first){
+                start_index = i;
+                finding_first = false;
+            }
+            else{
+                end_index = i;
+                break;
+            }
+        }
+    }
+    
+    // name is from (start_index + 1) to (end_index - 1)
+    // now grab it
+    char whisper_username[end_index - start_index];
+    strncpy(whisper_username, given_string + start_index, end_index);
+    printf("Username being whispered to: %s", whisper_username);
+    
+    
+}
 
 
 // the "chat" part of the chatroom
@@ -109,7 +150,8 @@ void* server_to_client(void* args){
     int socket = given_args -> socket;
     int socket_number = given_args -> index;
     
-    char buff[MAX];  // define message variable
+    int command_int;  // for keeping track of commands
+    char buff[MAX];   // define message variable
     
     // read in username
     char username[NAME_SIZE];
@@ -131,6 +173,10 @@ void* server_to_client(void* args){
             break;
         }
         
+        // check to see if there's a whisper (@whisper "Test 2")
+        int command_int = parse_command(buff);
+        
+        
         // if msg contains "Exit" then server exit and chat ended. 
         if (strncmp("exit", buff, 4) == 0) { 
             printf("Server Exit..."); 
@@ -150,12 +196,6 @@ void* server_to_client(void* args){
             break; 
         }
         
-        // // check to see if there's a whisper (@whisper "Test 2")
-        // if (buff[0] == "@"){  // command being used
-            
-        //     // make sure that the name being whispered to exits
-            
-        // }
         
         // if not whispering
         // print buffer which contains the client contents 
