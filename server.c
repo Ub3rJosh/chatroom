@@ -74,10 +74,10 @@ struct thread_args{
 // returns the int that corresponds to various commands
 int parse_command(char *given_string){
     /* 
-       0 <-> whisper
-       1 <-> disconnect / exit
-       2 <-> TBD
-       
+        0 <-> whisper
+        1 <-> disconnect / exit
+        2 <-> TBD
+        ...
        -1 <-> fail
     */
    
@@ -98,14 +98,16 @@ int parse_command(char *given_string){
     strncpy(command, given_string, end_index);
     
     printf("input command: %s", command);
+    printf("\n");
     
     // find the int associated with each commant
-    if (strcmp(command, "@whisper") == 0){
+    if (strcmp(command, "@exit") == 0){
         return 0;
     }
-    else if (strcmp(command, "@exit") == 0){
+    else if (strcmp(command, "@whisper") == 0){
         return 1;
     }
+    // else if (strcmp(command, "@...") == 0){...}
     else{
         printf("command unknown: %s", command);
         return -1;  // fail case 
@@ -120,12 +122,15 @@ int parse_whisper(char *given_string){
     bool finding_first = true;
     int start_index = 0;
     int end_index = 0;
+    
     for (int i = 0; i < strlen(given_string); i++){
         if (given_string[i] == ' '){
+            // find first space (after @whisper)
             if (finding_first){
                 start_index = i;
                 finding_first = false;
             }
+            // find second space (after username of @whisper)
             else{
                 end_index = i;
                 break;
@@ -139,7 +144,13 @@ int parse_whisper(char *given_string){
     strncpy(whisper_username, given_string + start_index, end_index);
     printf("Username being whispered to: %s", whisper_username);
     
-    
+    // find socket of username in `client_connection_array`
+    for (int i = 0; i < connected_clients; i++){
+        if (client_connection_array[i].username == whisper_username){
+            return client_connection_array[i].socket;  // return socket of whispered-to client
+        }
+    }
+    return -1;  // fail case (username couldn't be found)
 }
 
 
@@ -173,12 +184,11 @@ void* server_to_client(void* args){
             break;
         }
         
-        // check to see if there's a whisper (@whisper "Test 2")
-        int command_int = parse_command(buff);
         
+        int command_int = parse_command(buff);  // check for command being given
         
-        // if msg contains "Exit" then server exit and chat ended. 
-        if (strncmp("exit", buff, 4) == 0) { 
+        // start if chain
+        if (command_int == 0){  // exit command hit
             printf("Server Exit..."); 
             
             // send message stating disconnect
@@ -195,29 +205,45 @@ void* server_to_client(void* args){
             }
             break; 
         }
-        
-        
-        // if not whispering
-        // print buffer which contains the client contents 
-        printf("From client %d (%s): %s", socket_number, client_connection_array[socket_number].username, buff); 
-        
-        // and send that buffer to client 
-        // loop through clients and send message to all connected clients (that didn't send the message)
-        for (int i = 0; i < connected_clients; i++){
+        else if (command_int == 1){  // whisper command hit
+            int whisper_socket = parse_whisper(buff);
+            printf("From client %d (whispered to %d) (%s): %s", socket_number, whisper_socket, client_connection_array[whisper_socket].username, buff);
+            
             pthread_mutex_lock(&lock);  // keep the threads behaving
             
             // send the message to all threads that did not send message
-            char message[14 + MAX + NAME_SIZE];
-            int socket_i = client_connection_array[i].socket;
-            if (client_connection_array[i].still_connected && (socket != socket_i)){
-                snprintf(message, sizeof(message), "%s: %s", 
-                         client_connection_array[socket_number].username, buff);
-                write(socket_i,  message, sizeof(message));
-            }
+            char message[25 + MAX + NAME_SIZE];
+            snprintf(message, sizeof(message), "%s (whispered): %s", client_connection_array[whisper_socket].username, buff);
+            write(whisper_socket,  message, sizeof(message));
             
             pthread_mutex_unlock(&lock);  // free thread
         }
-    }
+        // else if (command_int == ...){...}
+        else{  // no command found 
+            // if not whispering (or otherwise using a command)
+            // print buffer which contains the client contents 
+            printf("From client %d (%s): %s", socket_number, client_connection_array[socket_number].username, buff); 
+            
+            // and send that buffer to client 
+            // loop through clients and send message to all connected clients (that didn't send the message)
+            for (int i = 0; i < connected_clients; i++){
+                pthread_mutex_lock(&lock);  // keep the threads behaving
+                
+                // send the message to all threads that did not send message
+                char message[14 + MAX + NAME_SIZE];
+                int socket_i = client_connection_array[i].socket;
+                if (client_connection_array[i].still_connected && (socket != socket_i)){
+                    snprintf(message, sizeof(message), "%s: %s", 
+                            client_connection_array[socket_number].username, buff);
+                    write(socket_i,  message, sizeof(message));
+                }
+                
+                pthread_mutex_unlock(&lock);  // free thread
+            }
+        }
+    }  // end for
+        
+        
     free(given_args);  // malloc'd in else statement of server_running while loop in main
     return NULL;
 }

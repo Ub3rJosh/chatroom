@@ -80,7 +80,7 @@ void* send_to_server(void* args){
         }
         
         // exit if that's what we want
-        if (strncmp(buff, "exit", 4) == 0){
+        if (strncmp(buff, "@exit", 5) == 0){
             printf("\n");
             break;
         }
